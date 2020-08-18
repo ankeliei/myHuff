@@ -2,9 +2,8 @@
 using namespace std;
 
 
-struct huffman
-{
-    int n;                  //节点前驱
+struct huffman{
+    int n;                  //节点权重
     unsigned char data;     //节点中存放的数据
     struct huffman *p;      //指向父节点
     struct huffman *l;      //指向左节点
@@ -12,7 +11,17 @@ struct huffman
     struct huffman *next;   //后驱指针
 };
 
+struct code{
+    int len;                //编码长度
+    unsigned int code;               //huffman编码本体
+    unsigned char data;     //对应的数据
+    struct code *next;
+}codeHe;
+
 struct huffman *head = NULL;
+struct code *codeHead = &codeHe;        //初始化创建一个huffman编码链表
+struct code * pcode = codeHead;
+int maxLen = 0;
 
 void sort(struct huffman **h){                //传入head指针的地址
     head = *h;
@@ -101,17 +110,17 @@ void traversal(char *file)
     }
 }
 
-void printhuffman(struct huffman *root) {
+void _printtree(struct huffman *root) {
     if(root->l==NULL && root->r==NULL)
         cout << root->data << "===" << root->n <<endl;
     else{
-        printhuffman(root->l);
-        printhuffman(root->r);
+        _printtree(root->l);
+        _printtree(root->r);
     }
 }
 
 void printtree(){
-    printhuffman(head);
+    _printtree(head);
 }
 
 void tree(){
@@ -130,5 +139,30 @@ void tree(){
         head = p;
         sort(&head);
     }
-
 }
+
+void _code(struct huffman * root, int code, int len){
+    if( root->l == NULL && root->r == NULL ) {
+        pcode->code = code;
+        pcode->data = root->data;
+        pcode->len = len;
+        pcode->next = (struct code *)malloc(sizeof(struct code));
+        pcode->next->next = NULL;       //初始化后一个节点的后驱指针为空
+        if(pcode->len > maxLen) maxLen = pcode->len;    //取得全链表最长的huffman编码长度
+        pcode = pcode->next;            //code链表指针后移一位，准备下次接收
+    }
+    else{
+        _code(root->l, code*2, len+1);
+        _code(root->r, code*2+1, len+1);
+    }
+}
+
+void code(){
+    _code( head, 0, 0 );
+    pcode = codeHead;
+    while(pcode->next!=NULL){
+        cout << pcode->data << "==" << pcode->code << "==" << pcode->len << endl;
+        pcode = pcode->next;
+    }
+}
+
