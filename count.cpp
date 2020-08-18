@@ -12,16 +12,23 @@ struct huffman{
 };
 
 struct code{
+    int n;
     int len;                //编码长度
-    unsigned int code;               //huffman编码本体
+    unsigned int code;      //huffman编码本体
     unsigned char data;     //对应的数据
     struct code *next;
 }codeHe;
 
-struct huffman *head = NULL;
+struct huffman *head = NULL;            //初始化创建一个huffman树(第一次遍历文件时作为频率表)
 struct code *codeHead = &codeHe;        //初始化创建一个huffman编码链表
-struct code * pcode = codeHead;
-int maxLen = 0;
+struct code *pcode = codeHead;
+int maxLen = 0;                         //huffman编码最大的值
+int code_link_len = 0;                  //huffman编码链表的长度
+int tail = 0;                           //编码区尾巴的长度
+long int sum_code_len = 0;              //编码区的长度
+long int old_file_len = 0;              //原始文件的长度
+long int head_len = 0;
+
 
 void sort(struct huffman **h){                //传入head指针的地址
     head = *h;
@@ -97,9 +104,10 @@ void traversal(char *file)
     if ((fp = fopen(file, "rb")) == NULL)
         cout << "Can not open " << file << endl;
     fseek(fp, 0, SEEK_END);
-    long end = ftell(fp);
+    long int end = ftell(fp);
     fseek(fp, 0, SEEK_SET);
-    long start = ftell(fp);
+    long int start = ftell(fp);
+    old_file_len = end*8;                 //上报原始文件长度
 
     while (end != start)
     {
@@ -108,6 +116,7 @@ void traversal(char *file)
         count(buf);
         start = ftell(fp);
     }
+    fclose(fp);
 }
 
 void _printtree(struct huffman *root) {
@@ -143,13 +152,14 @@ void tree(){
 
 void _code(struct huffman * root, int code, int len){
     if( root->l == NULL && root->r == NULL ) {
+        pcode->n = root->n;
         pcode->code = code;
         pcode->data = root->data;
         pcode->len = len;
         pcode->next = (struct code *)malloc(sizeof(struct code));
-        pcode->next->next = NULL;       //初始化后一个节点的后驱指针为空
+        pcode->next->next = NULL;                       //初始化后一个节点的后驱指针为空
         if(pcode->len > maxLen) maxLen = pcode->len;    //取得全链表最长的huffman编码长度
-        pcode = pcode->next;            //code链表指针后移一位，准备下次接收
+        pcode = pcode->next;                            //code链表指针后移一位，准备下次接收
     }
     else{
         _code(root->l, code*2, len+1);
@@ -161,8 +171,81 @@ void code(){
     _code( head, 0, 0 );
     pcode = codeHead;
     while(pcode->next!=NULL){
-        cout << pcode->data << "==" << pcode->code << "==" << pcode->len << endl;
+    //    cout << pcode->data << "==" << pcode->code << "==" << pcode->len << "==" << pcode->n << endl;
+        sum_code_len = sum_code_len + (pcode->n)*(pcode->len);      //上报编码区总长度
+        code_link_len++;                                            //上报编码链表长度
         pcode = pcode->next;
     }
+    head_len = (code_link_len*9 + 4) * 8;                           //上报压缩文件头部编码表区的长度
 }
 
+
+
+void huffwrite(char *new_file, char *old_file){
+    pcode = codeHead;
+    ofstream outfile;
+    unsigned int tmp;                       //写入huffmancode的凑整暂存区
+    int tmp_len = 0;                        //tmp已填充的长度计数
+    char *wbuf;                             //write()方法的参数
+    
+    outfile.open(new_file, ios::out | ios::trunc | ios::binary );  //新建文件或覆盖，可写入模式
+    
+    //outfile << code_link_len;               //向文件中写入头部区主要内容的长度，（实际应该对其*9）
+    //wbuf = (unsigned char *)&code_link_len;
+    outfile.write((char *)&code_link_len, 4);
+    outfile.write((char *)&tail, 4);
+    
+    cout << code_link_len;
+    cout << tail;
+    
+    int i = 0;                              //向文件中写入huffman编码表，每个部分占9字节长度。
+    for(i; i<code_link_len; i++) {
+        outfile.write((char *)&pcode->code,4);             //huffman编码，unsigned int形式存放，长度4字节
+        outfile.write((char *)&pcode->len, 4);             //huffman编码长度，int形式存放，长度4字节
+        outfile.write((char *)&pcode->data,1);             //编码所代表的数据，unsigned形式存放，长度1字节
+
+        cout << pcode->code;
+        cout << pcode->len;
+        cout << pcode->data;
+
+        pcode = pcode->next;
+    }
+
+    pcode = codeHead;
+    FILE *fp;                               //遍历文件，将每个字节的内容翻译为huffman编码写入新文件
+    unsigned char *buf = new unsigned char;
+    if ((fp = fopen(old_file, "rb")) == NULL)
+        cout << "Can not open " << old_file << endl;
+    fseek(fp, 0, SEEK_END);
+    long int end = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    long int start = ftell(fp);
+
+    while (end != start)
+    {
+        fread(buf, 1, 1, fp);
+        while(pcode->next!=NULL) {                          //遍历找到此字节对应的huffcode节点
+            if(pcode->data == *buf) break;
+            pcode = pcode->next;
+        }
+        tmp_len = tmp_len + pcode->len;                     //tmp的计数器工作一次
+        if(tmp_len<=32) {                                   //tmp未满的情况
+            tmp = tmp + ( pcode->code << (32-tmp_len));
+        }
+        if(tmp_len > 32) {                                  //tmp满了的情况
+            tmp = tmp + ( pcode->code >> (tmp_len-32));         //向tmp中填入部分数据将其32位凑齐
+            outfile.write((char *)&tmp,4);                      //将已经满了的tmp写入
+            cout << tmp;
+            tmp = 0;                                            //重新初始化tmp
+            tmp = tmp + ( pcode->code << (32-(tmp_len-32)));    //刚刚没装载完的部分
+            tmp_len = tmp_len - 32;                             //重新设置tmp的计数器
+        }
+        start = ftell(fp);
+    }
+    if(tmp_len!=0){                                         //文件读完了最后检查凑不够整还没有写入新文件的小尾巴
+        outfile.write((char *)&tmp,4);
+        cout << tmp;
+        tail = tmp_len;
+    }
+    fclose(fp);
+}
