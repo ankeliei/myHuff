@@ -100,7 +100,7 @@ void count(unsigned char *buf)
 void traversal(char *file)
 {
     FILE *fp;
-    unsigned char *buf;
+    unsigned char *buf = new unsigned char;
     if ((fp = fopen(file, "rb")) == NULL)
         cout << "Can not open " << file << endl;
     fseek(fp, 0, SEEK_END);
@@ -172,11 +172,12 @@ void code(){
     pcode = codeHead;
     while(pcode->next!=NULL){
     //    cout << pcode->data << "==" << pcode->code << "==" << pcode->len << "==" << pcode->n << endl;
-        sum_code_len = sum_code_len + (pcode->n)*(pcode->len);      //上报编码区总长度
-        code_link_len++;                                            //上报编码链表长度
+        sum_code_len = sum_code_len + (pcode->n)*(pcode->len);      //上报编码区总长度（位）
+        code_link_len++;                                            //上报编码链表长度（个数）
         pcode = pcode->next;
     }
-    head_len = (code_link_len*9 + 4) * 8;                           //上报压缩文件头部编码表区的长度
+    head_len = (code_link_len*9 + 8) * 8;                           //上报压缩文件头部编码表区的长度（位）
+    tail = sum_code_len % 32;                                       //上报小尾巴的长度（位）
 }
 
 
@@ -184,14 +185,11 @@ void code(){
 void huffwrite(char *new_file, char *old_file){
     pcode = codeHead;
     ofstream outfile;
-    unsigned int tmp;                       //写入huffmancode的凑整暂存区
+    unsigned int tmp = 0;                   //写入huffmancode的凑整暂存区
     int tmp_len = 0;                        //tmp已填充的长度计数
-    char *wbuf;                             //write()方法的参数
     
     outfile.open(new_file, ios::out | ios::trunc | ios::binary );  //新建文件或覆盖，可写入模式
     
-    //outfile << code_link_len;               //向文件中写入头部区主要内容的长度，（实际应该对其*9）
-    //wbuf = (unsigned char *)&code_link_len;
     outfile.write((char *)&code_link_len, 4);
     outfile.write((char *)&tail, 4);
     
@@ -211,7 +209,6 @@ void huffwrite(char *new_file, char *old_file){
         pcode = pcode->next;
     }
 
-    pcode = codeHead;
     FILE *fp;                               //遍历文件，将每个字节的内容翻译为huffman编码写入新文件
     unsigned char *buf = new unsigned char;
     if ((fp = fopen(old_file, "rb")) == NULL)
@@ -223,6 +220,7 @@ void huffwrite(char *new_file, char *old_file){
 
     while (end != start)
     {
+        pcode = codeHead;
         fread(buf, 1, 1, fp);
         while(pcode->next!=NULL) {                          //遍历找到此字节对应的huffcode节点
             if(pcode->data == *buf) break;
@@ -245,7 +243,7 @@ void huffwrite(char *new_file, char *old_file){
     if(tmp_len!=0){                                         //文件读完了最后检查凑不够整还没有写入新文件的小尾巴
         outfile.write((char *)&tmp,4);
         cout << tmp;
-        tail = tmp_len;
     }
     fclose(fp);
+    outfile.close();
 }
