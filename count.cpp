@@ -174,6 +174,11 @@ void code(){
         pcode = pcode->next;
     }
     head_len = (code_link_len*9 + 12) * 8;                          //上报压缩文件头部区的长度（位）
+    cout << "原始文件大小：" << old_file_len << endl;
+    cout << "压缩正文大小：" << sum_code_len << endl;
+    cout << "压缩文件大小：" << sum_code_len+head_len << endl;
+    cout << "理论压缩率：" << ((float)sum_code_len)/old_file_len << endl;
+    cout << "实际压缩率：" << ((float)(sum_code_len+head_len))/old_file_len << endl;
 }
 
 void huffwrite(char *new_file, char *old_file){
@@ -187,18 +192,11 @@ void huffwrite(char *new_file, char *old_file){
     outfile.write((char *)&code_link_len, 4);           //写入编码链表的长度(个数)
     outfile.write((char *)&sum_code_len, 8);            //写入正文的长度（位）
     
-    cout << code_link_len;
-    cout << sum_code_len;
-    
     int i = 0;                              //向文件中写入huffman编码表，每个部分占9字节长度。
     for(i; i<code_link_len; i++) {
         outfile.write((char *)&pcode->code,4);             //huffman编码，unsigned int形式存放，长度4字节
         outfile.write((char *)&pcode->len, 4);             //huffman编码长度，int形式存放，长度4字节
         outfile.write((char *)&pcode->data,1);             //编码所代表的数据，unsigned形式存放，长度1字节
-
-        cout << pcode->code;
-        cout << pcode->len;
-        cout << pcode->data;
 
         pcode = pcode->next;
     }
@@ -227,7 +225,6 @@ void huffwrite(char *new_file, char *old_file){
         if(tmp_len > 32) {                                  //tmp满了的情况
             tmp = tmp + ( pcode->code >> (tmp_len-32));         //向tmp中填入部分数据将其32位凑齐
             outfile.write((char *)&tmp,4);                      //将已经满了的tmp写入
-            cout << tmp;
             tmp = 0;                                            //重新初始化tmp
             tmp = tmp + ( pcode->code << (32-(tmp_len-32)));    //刚刚没装载完的部分
             tmp_len = tmp_len - 32;                             //重新设置tmp的计数器
@@ -236,7 +233,6 @@ void huffwrite(char *new_file, char *old_file){
     }
     if(tmp_len!=0){                                         //文件读完了最后检查凑不够整还没有写入新文件的小尾巴
         outfile.write((char *)&tmp,4);
-        cout << tmp;
     }
     fclose(fp);
     outfile.close();
