@@ -1,7 +1,6 @@
 #include "myHuff.h"
 using namespace std;
 
-
 struct huffman{
     int n;                  //节点权重
     unsigned char data;     //节点中存放的数据
@@ -23,11 +22,10 @@ struct huffman *head = NULL;            //初始化创建一个huffman树(第一
 struct code *codeHead = &codeHe;        //初始化创建一个huffman编码链表
 struct code *pcode = codeHead;
 int maxLen = 0;                         //huffman编码最大的值
-int code_link_len = 0;                  //huffman编码链表的长度
-int tail = 0;                           //编码区尾巴的长度
-long int sum_code_len = 0;              //编码区的长度
-long int old_file_len = 0;              //原始文件的长度
-long int head_len = 0;
+int code_link_len = 0;                  //huffman编码链表的长度（个数）
+unsigned long int sum_code_len = 0;              //正文区的长度（位）
+unsigned long int old_file_len = 0;              //原始文件的长度（位）
+long int head_len = 0;                          //头部区长度(位)
 
 
 void sort(struct huffman **h){                //传入head指针的地址
@@ -107,7 +105,7 @@ void traversal(char *file)
     long int end = ftell(fp);
     fseek(fp, 0, SEEK_SET);
     long int start = ftell(fp);
-    old_file_len = end*8;                 //上报原始文件长度
+    old_file_len = end*8;                 //上报原始文件长度（位）
 
     while (end != start)
     {
@@ -171,16 +169,12 @@ void code(){
     _code( head, 0, 0 );
     pcode = codeHead;
     while(pcode->next!=NULL){
-    //    cout << pcode->data << "==" << pcode->code << "==" << pcode->len << "==" << pcode->n << endl;
-        sum_code_len = sum_code_len + (pcode->n)*(pcode->len);      //上报编码区总长度（位）
+        sum_code_len = sum_code_len + (pcode->n)*(pcode->len);      //上报正文区总长度（位）
         code_link_len++;                                            //上报编码链表长度（个数）
         pcode = pcode->next;
     }
-    head_len = (code_link_len*9 + 8) * 8;                           //上报压缩文件头部编码表区的长度（位）
-    tail = sum_code_len % 32;                                       //上报小尾巴的长度（位）
+    head_len = (code_link_len*9 + 12) * 8;                          //上报压缩文件头部区的长度（位）
 }
-
-
 
 void huffwrite(char *new_file, char *old_file){
     pcode = codeHead;
@@ -190,11 +184,11 @@ void huffwrite(char *new_file, char *old_file){
     
     outfile.open(new_file, ios::out | ios::trunc | ios::binary );  //新建文件或覆盖，可写入模式
     
-    outfile.write((char *)&code_link_len, 4);
-    outfile.write((char *)&tail, 4);
+    outfile.write((char *)&code_link_len, 4);           //写入编码链表的长度(个数)
+    outfile.write((char *)&sum_code_len, 8);            //写入正文的长度（位）
     
     cout << code_link_len;
-    cout << tail;
+    cout << sum_code_len;
     
     int i = 0;                              //向文件中写入huffman编码表，每个部分占9字节长度。
     for(i; i<code_link_len; i++) {
