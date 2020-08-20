@@ -117,19 +117,6 @@ void traversal(char *file)
     fclose(fp);
 }
 
-void _printtree(struct huffman *root) {
-    if(root->l==NULL && root->r==NULL)
-        cout << root->data << "===" << root->n <<endl;
-    else{
-        _printtree(root->l);
-        _printtree(root->r);
-    }
-}
-
-void printtree(){
-    _printtree(head);
-}
-
 void tree(){
     while( head->next != NULL ){
         struct huffman *p = (struct huffman *)malloc(sizeof(struct huffman));

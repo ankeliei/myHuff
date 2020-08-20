@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
         huffwrite(new_file, old_file);
         return 0;
     }
-    if(argc==4){
+    if(argc==4 && strcmp(argv[1],"-x") == 0){
         char old_file[255];
         char new_file[255];
         strcpy(old_file, argv[2]);
